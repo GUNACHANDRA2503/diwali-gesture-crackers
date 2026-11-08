@@ -1,6 +1,6 @@
 # 🪔 Diwali Crackers: light fireworks with your hands
 
-**▶ Live: https://gunachandra2503.github.io/diwali-gesture-crackers/** (allow the camera, then show a gesture)
+**▶ Live: https://diwali-gesture-crackers.pages.dev** (allow the camera, then show a gesture) · mirror: https://gunachandra2503.github.io/diwali-gesture-crackers/
 
 Crackers that pollute neither the air nor your ears: show a hand gesture to your webcam and Diwali
 fireworks burst from your fingers in real time. Everything runs in your browser, with no sign-up, no
@@ -72,12 +72,20 @@ There is nothing to build. The files in the repository root are the production s
 
 ## Deploy
 
-Hosted on **GitHub Pages** from the `main` branch root. Pages serves over HTTPS, which the camera needs.
+Two HTTPS hosts, both serving the same three files (the camera needs HTTPS):
+
+| Host | URL | Deploy |
+|---|---|---|
+| **Cloudflare Pages** (main) | https://diwali-gesture-crackers.pages.dev | `sh deploy-cloudflare.sh` (needs `wrangler login` once) |
+| GitHub Pages (mirror) | https://gunachandra2503.github.io/diwali-gesture-crackers/ | automatic on every push to `main` |
+
+`deploy-cloudflare.sh` copies only `index.html`, `404.html`, `app.js`, `gestures.js` and `_headers` into
+`dist/` and uploads that, so certificates, test frames and tool folders can never be published.
+`_headers` limits the page to the camera (no microphone or location) and adds basic security headers.
 There are no environment variables or secrets: `.env.example` only documents the optional local port.
 
-To deploy your own copy: fork → *Settings → Pages → Deploy from a branch → `main` / root*.
-Any static host works the same way (Netlify, Vercel or Cloudflare Pages with no build command and the
-project root as the output directory). No SPA fallback is needed because it's a single page.
+To deploy your own copy: fork → *Settings → Pages → Deploy from a branch → `main` / root*, or any
+static host with no build command. No SPA fallback is needed because it's a single page; unknown paths get `404.html`.
 
 ## Privacy
 

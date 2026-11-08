@@ -1,0 +1,6 @@
+# Cloudflare Pages response headers (GitHub Pages ignores this file).
+# Caching is left to Cloudflare's defaults (revalidate with ETag), so a new deploy shows up immediately.
+/*
+  Permissions-Policy: camera=(self), microphone=(), geolocation=()
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
