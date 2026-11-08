@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Gesture check</title>
+<style>
+  body { font: 14px system-ui, sans-serif; background: #111; color: #eee; padding: 16px; }
+  td, th { padding: 4px 10px; border-bottom: 1px solid #333; text-align: left; }
+  .ok { color: #7f7; } .bad { color: #f77; }
+</style>
+</head>
+<body>
+<h3>Tracker + classifier on reference-video frames</h3>
+<table><thead><tr><th>t (s)</th><th>expected</th><th>hands</th><th>got</th><th></th></tr></thead><tbody id="out"></tbody></table>
+<p id="sum"></p>
+<script type="module">
+import { FilesetResolver, HandLandmarker } from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs';
+import { classify, isNamaste } from '../gestures.js';
+
+// expected gesture(s) read from the reference video ('|' = acceptable alternatives)
+const CASES = {
+  '00.6': 'pinch', '01.0': 'pinch', '01.6': 'palm', '02.2': 'point', '02.6': 'point', '04.2': 'point|peace',
+  '05.0': 'fist', '05.4': 'fist', '06.5': 'pinch', '07.0': 'pinch', '09.0': 'pinch', '09.6': 'palm', '10.0': 'palm',
+  '10.5': 'namaste', '11.0': 'namaste', '11.5': 'namaste', '12.0': 'namaste',
+};
+const files = await FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm');
+const lmk = await HandLandmarker.createFromOptions(files, {
+  baseOptions: { modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task' },
+  runningMode: 'IMAGE', numHands: 2, minHandDetectionConfidence: 0.1, minHandPresenceConfidence: 0.1,
+});
+const results = [];
+let pass = 0;
+for (const [t, exp] of Object.entries(CASES)) {
+  const img = new Image(); img.src = `frames/${t}.jpg`; await img.decode();
+  const r = lmk.detect(img), lms = r.landmarks, aspect = img.width / img.height;
+  const got = lms.length === 2 && isNamaste(lms[0], lms[1], aspect) ? ['namaste'] : lms.map((l) => classify(l, aspect));
+  const ok = got.some((g) => exp.split('|').includes(g));
+  pass += ok;
+  results.push({ t, exp, got });
+  document.getElementById('out').insertAdjacentHTML('beforeend',
+    `<tr><td>${t}</td><td>${exp}</td><td>${lms.length}</td><td>${got.join(', ') || '—'}</td><td class="${ok ? 'ok' : 'bad'}">${ok ? 'ok' : 'MISS'}</td></tr>`);
+}
+document.getElementById('sum').textContent = `${pass} / ${Object.keys(CASES).length} frames match`;
+window.RESULTS = { pass, total: Object.keys(CASES).length, results };
+</script>
+</body>
+</html>

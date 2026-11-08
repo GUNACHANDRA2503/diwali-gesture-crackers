@@ -1,0 +1,23 @@
+# secrets / local certificates (serve-https.py makes a self-signed key here: never commit it)
+.cert/
+*.pem
+*.key
+.env
+.env.*
+!.env.example
+
+# reference-video frames used by the local test pages (personal footage; generate your own, see test/README.md)
+test/frames/
+
+# local tooling
+.claude/
+.impeccable/
+node_modules/
+__pycache__/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/

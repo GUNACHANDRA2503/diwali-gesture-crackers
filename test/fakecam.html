@@ -1,0 +1,27 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script>
+// Test harness: runs the real app with a fake webcam that cycles reference-video frames (?f=02.2,07.0)
+(async () => {
+  const names = (new URLSearchParams(location.search).get('f') || '02.2,07.0,09.0').split(',');
+  const imgs = await Promise.all(names.map((n) => { const i = new Image(); i.src = `frames/${n}.jpg`; return i.decode().then(() => i); }));
+  const c = Object.assign(document.createElement('canvas'), { width: 1280, height: 720 }), x = c.getContext('2d');
+  setInterval(() => {
+    const img = imgs[Math.floor(performance.now() / 3000) % imgs.length];
+    const s = Math.max(1280 / img.width, 720 / img.height);
+    x.drawImage(img, (1280 - img.width * s) / 2, (720 - img.height * s) / 2, img.width * s, img.height * s);
+  }, 33);
+  // ?src=https://example.com/app/ runs a deployed copy instead of the local one
+  const base = new URLSearchParams(location.search).get('src') || '../';
+  const html = (await (await fetch(new URL('index.html', new URL(base, location.href)), { cache: 'no-store' })).text())
+    .replace('<head>', `<head><base href="${base}">`)
+    .replace('<script type="module"', '<script>navigator.mediaDevices.getUserMedia = async () => parent.FAKE;<\/script><script type="module"');
+  window.FAKE = c.captureStream(30);
+  const f = document.createElement('iframe');
+  f.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;border:0';
+  document.body.appendChild(f);
+  f.contentDocument.open(); f.contentDocument.write(html); f.contentDocument.close();
+})();
+</script>
+<body style="margin:0;background:#000"></body>

@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#16060c">
+<title>Diwali Crackers</title>
+<meta name="description" content="Light Diwali crackers with your hands: real-time hand-gesture fireworks in your browser, by Gunachandra Devasani.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%AA%94%3C/text%3E%3C/svg%3E">
+<!-- start these connections early: the tracker library, its wasm and the hand model come from here -->
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="preconnect" href="https://storage.googleapis.com" crossorigin>
+<link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs" crossorigin>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&display=swap" rel="stylesheet">
+<style>
+  :root { --gold: #ffd34d; --plum: rgba(38, 10, 22, .78); --safe-b: env(safe-area-inset-bottom, 0px); }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; background: #000; overflow: hidden; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #fff;
+    -webkit-tap-highlight-color: transparent; }
+  video { display: none; }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; }
+  button { font: inherit; color: inherit; }
+
+  .top { position: fixed; top: max(14px, env(safe-area-inset-top)); right: 16px; display: flex; gap: 8px; z-index: 3; }
+  .top button { font: 600 12px system-ui, sans-serif; color: #fff; border: 1px solid rgba(255,255,255,.18); border-radius: 999px;
+    padding: 7px 12px; min-height: 32px; background: rgba(20,12,24,.7); backdrop-filter: blur(6px); cursor: pointer; }
+  .top button.on { background: rgba(255,200,80,.25); border-color: var(--gold); }
+  #rec { background: rgba(225,40,90,.85); border-color: transparent; }
+  #rec.on { animation: blink 1s infinite; }
+  @keyframes blink { 50% { opacity: .5; } }
+
+  .legend { position: fixed; left: 50%; bottom: calc(18px + var(--safe-b)); transform: translateX(-50%); display: flex; gap: 6px; padding: 6px;
+    background: rgba(22, 6, 12, .82); border: 1.5px solid rgba(214, 120, 70, .6); border-radius: 22px; backdrop-filter: blur(8px); z-index: 3;
+    max-width: calc(100vw - 32px); }
+  .pill { display: flex; align-items: center; gap: 8px; padding: 7px 14px 7px 10px; border-radius: 14px; background: rgba(80, 28, 40, .55);
+    border: 1px solid rgba(255, 255, 255, .06); cursor: pointer; text-align: left;
+    transition: background .15s, box-shadow .15s, transform .15s; white-space: nowrap; }
+  .pill i { font-style: normal; font-size: 18px; filter: saturate(1.4); }
+  .pill b { display: block; font-size: 12px; }
+  .pill small { display: block; font-size: 11px; color: rgba(255,255,255,.55); }
+  .pill.on { background: rgba(255,190,70,.28); box-shadow: 0 0 18px rgba(255,180,60,.45) inset; transform: translateY(-2px); }
+  .pill:focus-visible, .top button:focus-visible, .help button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+  #tag { position: fixed; right: 16px; bottom: calc(26px + var(--safe-b)); font-size: 11px; font-weight: 700; color: var(--gold); z-index: 3;
+    text-shadow: 0 0 8px rgba(255,190,60,.8); }
+  #msg { position: fixed; inset: 0; display: grid; place-items: center; text-align: center; padding: 24px; z-index: 4;
+    font-size: 15px; line-height: 1.6; color: rgba(255,255,255,.85); pointer-events: none; }
+  #msg.err { background: #0b0610; pointer-events: auto; }
+  #msg h2 { font-family: Cinzel, serif; color: var(--gold); margin-bottom: 8px; }
+
+  /* friendly, occasional hint above the legend */
+  #hint { position: fixed; left: 50%; bottom: calc(92px + var(--safe-b)); transform: translate(-50%, 8px); z-index: 3; max-width: calc(100vw - 32px);
+    padding: 10px 16px; border-radius: 14px; background: rgba(22, 6, 12, .88); border: 1px solid rgba(255, 200, 110, .35);
+    font-size: 14px; line-height: 1.4; text-align: center; opacity: 0; pointer-events: none; transition: opacity .35s, transform .35s; }
+  #hint.show { opacity: 1; transform: translate(-50%, 0); }
+
+  /* how-to-play guide */
+  .help { position: fixed; inset: 0; z-index: 5; display: grid; place-items: center; padding: 16px; background: rgba(8, 2, 6, .72); backdrop-filter: blur(4px); }
+  .help[hidden] { display: none; }
+  .help-card { width: min(720px, 100%); max-height: calc(100dvh - 32px); overflow-y: auto; padding: 22px; border-radius: 22px;
+    background: #1b0810; border: 1.5px solid rgba(214, 120, 70, .6); }
+  .help h2 { font-family: Cinzel, serif; color: var(--gold); font-size: 22px; text-align: center; }
+  .help .lead { text-align: center; color: rgba(255,255,255,.7); font-size: 14px; margin: 6px 0 16px; }
+  .moves { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; list-style: none; padding: 0; }
+  .moves li { display: grid; grid-template-columns: 48px 1fr; gap: 10px; align-items: center; padding: 12px; border-radius: 14px; background: rgba(80, 28, 40, .55); }
+  .moves i { font-style: normal; font-size: 38px; line-height: 1; text-align: center; }
+  .moves b { display: block; font-size: 14px; color: #ffe7a8; }
+  .moves span { display: block; font-size: 12px; color: rgba(255,255,255,.75); margin-top: 2px; line-height: 1.35; }
+  .tips { margin: 14px 0 4px; padding-left: 18px; font-size: 13px; color: rgba(255,255,255,.75); line-height: 1.6; }
+  .go { display: block; margin: 16px auto 0; padding: 12px 28px; min-height: 44px; border: 0; border-radius: 999px; cursor: pointer;
+    font-weight: 700; font-size: 15px; color: #2a0d00; background: linear-gradient(180deg, #ffe27a, #ffad1f); }
+
+  #banner { position: fixed; left: 50%; top: 46%; transform: translate(-50%, -50%); text-align: center; z-index: 2;
+    opacity: 0; transition: opacity 1.2s; pointer-events: none; width: min(92vw, 900px); }
+  #banner.show { opacity: 1; }
+  .diyas { display: flex; justify-content: center; gap: clamp(14px, 3vw, 34px); margin-bottom: 10px; }
+  .diya { position: relative; width: 34px; height: 30px; }
+  .diya::before { content: ""; position: absolute; left: 50%; top: -2px; width: 12px; height: 20px; transform: translateX(-50%);
+    border-radius: 50% 50% 50% 50% / 65% 65% 35% 35%; background: radial-gradient(circle at 50% 70%, #fff 0 18%, #ffe066 35%, #ff8a00 70%, transparent 72%);
+    box-shadow: 0 0 10px 2px rgba(255,179,0,.8), 0 0 24px 6px rgba(255,122,0,.45); }
+  /* no flame flicker animation: it forced a repaint of the whole glowing banner every frame (finale fell to ~10 fps) */
+  .diya::after { content: ""; position: absolute; left: 0; bottom: 0; width: 34px; height: 13px; border-radius: 0 0 17px 17px;
+    background: linear-gradient(#e0782c, #8a3b12); box-shadow: 0 0 12px rgba(255,140,40,.6); }
+  /* Readability: the finale puts bright additive fireworks and a warm tint right behind the banner, so
+     glow-only text (gold on gold, white with an orange halo) washed out. A soft dark scrim sits behind
+     the banner, and every line gets a dark outline/shadow instead of a same-colour glow. */
+  #banner::before { content: ""; position: absolute; inset: -18% -8%; z-index: -1; pointer-events: none;
+    background: radial-gradient(ellipse at center, rgba(28, 4, 12, .72) 0%, rgba(28, 4, 12, .5) 45%, rgba(28, 4, 12, 0) 72%); }
+  .over { font-family: Cinzel, serif; font-weight: 700; letter-spacing: .45em; font-size: clamp(11px, 1.4vw, 15px); color: #fff3c4;
+    text-shadow: 0 1px 2px rgba(0,0,0,.95), 0 0 10px rgba(0,0,0,.7); }
+  .title-wrap { position: relative; font-family: Cinzel, serif; font-weight: 900; font-size: clamp(30px, 9vw, 110px);
+    line-height: 1.05; white-space: nowrap; letter-spacing: .04em; }
+  /* shadow + glow from a text-shadow copy BEHIND the gradient text (on the wrapper, so it can't paint over
+     the gold fill); filter: drop-shadow here dropped the finale to ~10 fps */
+  .title-wrap::before { content: attr(data-t); position: absolute; inset: 0; color: transparent;
+    text-shadow: 0 3px 0 #4a1200, 0 6px 14px rgba(0,0,0,.85), 0 0 34px rgba(255,120,0,.55); }
+  .title { position: relative;
+    background: linear-gradient(180deg, #fffbe0 0%, #ffd84a 42%, #ff8c00 100%); -webkit-background-clip: text; background-clip: text; color: transparent;
+    -webkit-text-stroke: 1.5px #5a1800; /* dark rim keeps the letters crisp over bright bursts */ }
+  .sub { font-size: clamp(13px, 1.6vw, 18px); font-weight: 600; color: #fff; margin-top: 8px;
+    text-shadow: 0 1px 2px rgba(0,0,0,.95), 0 0 12px rgba(0,0,0,.75); }
+  .from { font-size: 12px; font-weight: 600; letter-spacing: .03em; color: #ffe9b0; margin-top: 12px;
+    text-shadow: 0 1px 2px rgba(0,0,0,.95), 0 0 10px rgba(0,0,0,.75); }
+
+  /* about the creator */
+  .about-card { width: min(440px, 100%); text-align: center; }
+  .avatar { width: 76px; height: 76px; margin: 0 auto 10px; border-radius: 50%; display: grid; place-items: center;
+    font: 900 26px Cinzel, serif; color: #2a0d00; background: linear-gradient(180deg, #ffe27a, #ff9a1f); border: 2px solid rgba(255,231,168,.7); }
+  .links { display: grid; gap: 8px; margin-top: 4px; }
+  .links a { display: flex; align-items: center; justify-content: center; min-height: 44px; padding: 10px 14px; border-radius: 14px;
+    background: rgba(80, 28, 40, .55); border: 1px solid rgba(255,255,255,.1); color: #ffe7a8; font-weight: 600; font-size: 14px; text-decoration: none; }
+  .links a:hover { background: rgba(255,190,70,.2); }
+  .links a:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  .made { margin-top: 14px; font-size: 13px; line-height: 1.5; color: rgba(255,255,255,.7); }
+
+  /* tablets / narrow laptops: wrap the legend instead of cutting it off */
+  @media (max-width: 980px) {
+    .legend { display: grid; grid-template-columns: repeat(3, auto); } /* tidy 3 x 2 instead of a ragged wrap */
+    #tag { display: none; }
+  }
+  /* phones: 3 x 2 grid of big, readable gesture tiles */
+  @media (max-width: 640px) {
+    .top { left: 16px; right: 16px; justify-content: flex-end; }
+    .top .lbl { display: none; } /* icon-only About / How to play so all four buttons fit */
+    .top button { min-width: 36px; }
+    .legend { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; padding: 5px; width: calc(100vw - 16px); max-width: none;
+      bottom: calc(8px + var(--safe-b)); border-radius: 18px; }
+    .pill { flex-direction: column; gap: 2px; padding: 7px 4px; text-align: center; white-space: normal; }
+    .pill i { font-size: 24px; }
+    .pill b { font-size: 11.5px; }
+    .pill small { font-size: 11px; }
+    #hint { bottom: calc(150px + var(--safe-b)); font-size: 13px; }
+    .moves { grid-template-columns: 1fr 1fr; }
+    .moves li { grid-template-columns: 1fr; text-align: center; gap: 4px; padding: 10px 8px; }
+    .help-card { padding: 18px 14px; }
+    #banner { top: 38%; }
+  }
+  @media (prefers-reduced-motion: reduce) { #hint, .pill { transition: none; } }
+</style>
+</head>
+<body>
+<video id="cam" playsinline muted></video>
+<canvas id="fx"></canvas>
+
+<div class="top">
+  <button id="aboutBtn" type="button" aria-haspopup="dialog" aria-label="About the creator">👤<span class="lbl"> About</span></button>
+  <button id="helpBtn" type="button" aria-haspopup="dialog" aria-label="How to play">❓<span class="lbl"> How to play</span></button>
+  <button id="sound" type="button" aria-pressed="false">🔈 Sound</button>
+  <button id="rec" type="button" aria-pressed="false">● Record</button>
+</div>
+
+<div id="banner" aria-live="polite">
+  <div class="diyas"><span class="diya"></span><span class="diya"></span><span class="diya"></span><span class="diya"></span><span class="diya"></span></div>
+  <div class="over">✦ SHUBH DEEPAVALI ✦</div>
+  <div class="title-wrap" data-t="HAPPY DIWALI"><div class="title">HAPPY DIWALI</div></div>
+  <div class="sub">May your world bloom with light, joy &amp; prosperity</div>
+  <div class="from">— with love from Gunachandra Devasani —</div>
+</div>
+
+<nav class="legend" aria-label="Gestures (tap for help)">
+  <button class="pill" type="button" data-g="point"><i aria-hidden="true">☝️</i><span><b>Rocket</b><small>Point Up</small></span></button>
+  <button class="pill" type="button" data-g="fist"><i aria-hidden="true">✊</i><span><b>Anar</b><small>Fist</small></span></button>
+  <button class="pill" type="button" data-g="palm"><i aria-hidden="true">✋</i><span><b>Starburst</b><small>Palm</small></span></button>
+  <button class="pill" type="button" data-g="peace"><i aria-hidden="true">✌️</i><span><b>Roman Candle</b><small>Peace</small></span></button>
+  <button class="pill" type="button" data-g="pinch"><i aria-hidden="true">👌</i><span><b>Phooljhadi</b><small>Pinch</small></span></button>
+  <button class="pill" type="button" data-g="namaste"><i aria-hidden="true">🙏</i><span><b>Finale</b><small>Namaste</small></span></button>
+</nav>
+
+<div id="hint" role="status" aria-live="polite"></div>
+
+<div class="help" id="help" role="dialog" aria-modal="true" aria-labelledby="helpTitle" hidden>
+  <div class="help-card">
+    <h2 id="helpTitle">🪔 Light up Diwali with your hands</h2>
+    <p class="lead">Show a gesture to the camera and hold it still for a moment.</p>
+    <ul class="moves">
+      <li><i>☝️</i><div><b>Rocket</b><span>Point one finger straight up</span></div></li>
+      <li><i>✊</i><div><b>Anar</b><span>Make a tight fist</span></div></li>
+      <li><i>✋</i><div><b>Starburst</b><span>Open your palm, fingers spread</span></div></li>
+      <li><i>✌️</i><div><b>Roman Candle</b><span>Show a V. Tilt it to aim the shots</span></div></li>
+      <li><i>👌</i><div><b>Phooljhadi</b><span>Touch thumb and index tips, then draw in the air</span></div></li>
+      <li><i>🙏</i><div><b>Grand Finale</b><span>Press both palms together</span></div></li>
+    </ul>
+    <ul class="tips">
+      <li>Keep your hand in view, about an arm's length from the camera.</li>
+      <li>Use both hands for two crackers at once.</li>
+      <li>Touching your face or moving casually won't set anything off.</li>
+    </ul>
+    <button class="go" id="helpClose" type="button">Let's go! ✨</button>
+  </div>
+</div>
+
+<div class="help" id="about" role="dialog" aria-modal="true" aria-labelledby="aboutTitle" hidden>
+  <div class="help-card about-card">
+    <div class="avatar" aria-hidden="true">GD</div>
+    <h2 id="aboutTitle">Gunachandra Devasani</h2>
+    <p class="lead">Wishing you and your family a very <b>Happy Diwali!</b> 🪔✨<br>May this festival of lights fill your home with joy, health and prosperity.</p>
+    <div class="links">
+      <a href="https://www.instagram.com/guna_71810/" target="_blank" rel="noopener noreferrer">📸 Instagram · @guna_71810</a>
+      <a href="https://www.linkedin.com/in/gunachandra-d-855611206/" target="_blank" rel="noopener noreferrer">💼 LinkedIn · Gunachandra Devasani</a>
+    </div>
+    <p class="made">I made this interactive Diwali experience: crackers you light with your hands, using live hand tracking right in your browser. No smoke, no noise for the neighbours, just light. 🎆</p>
+    <button class="go" id="aboutClose" type="button">Happy Diwali! 🪔</button>
+  </div>
+</div>
+
+<div id="tag">✨ Happy Diwali from Gunachandra</div>
+<div id="msg">Starting camera…</div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
