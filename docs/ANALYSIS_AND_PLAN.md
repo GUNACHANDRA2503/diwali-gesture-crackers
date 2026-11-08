@@ -220,3 +220,23 @@ Open `http://localhost:5173/?debug` (or `https://<pc-ip>:8443/?debug` on a phone
 8. Rub your nose, push your glasses up, scratch your head and chin: nothing should fire.
 9. Sound on: each animation should have its own sound, starting with it.
 10. Run the finale three times in a row and switch gestures quickly for a minute: no glitches, stuck sounds or slowdown.
+
+---
+
+## Production: audit, deploy and live test (2026-11-08)
+
+**Live:** https://gunachandra2503.github.io/diwali-gesture-crackers/ · **Repo:** https://github.com/GUNACHANDRA2503/diwali-gesture-crackers · **Host:** GitHub Pages
+
+Optimisations: the models download while the camera prompt is up; the camera is released and the sound paused when the tab is hidden or the page is left (and reopened on return); the full-screen gradients and the camera mapping are cached instead of rebuilt every frame; audio voices are capped at 72; a built-in favicon removes a 404; early connections to the CDNs.
+
+Live tests (deployed files, run through `test/fakecam.html?src=<live url>`, since the test browser has no real camera):
+| Check | Result |
+|---|---|
+| HTTPS / secure context / getUserMedia available | yes |
+| Camera denied path | clear "Camera access blocked" message, no console errors |
+| Network | all requests 200; page load 1.4 s; hand model 1.2 s |
+| Gestures through the deployed pipeline | pinch, fist, point recognised; transitions clean |
+| Tab hidden → visible | camera released, then reopened; recognition resumed |
+| Frame time (p50) | idle 16.8 ms · every effect at once 16.8 ms · busiest finale 33 ms |
+| Memory over 3 finales | 17.5 → 16.6 → 16.8 MB (no growth) |
+| Layout 375 / 768 / desktop | no horizontal overflow; gesture bar 3×2 on phone and tablet |

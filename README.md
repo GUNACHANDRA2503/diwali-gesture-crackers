@@ -1,5 +1,7 @@
 # 🪔 Diwali Crackers: light fireworks with your hands
 
+**▶ Live: https://gunachandra2503.github.io/diwali-gesture-crackers/** (allow the camera, then show a gesture)
+
 Crackers that pollute neither the air nor your ears: show a hand gesture to your webcam and Diwali
 fireworks burst from your fingers in real time. Everything runs in your browser, with no sign-up, no
 upload and no server.
